@@ -414,7 +414,30 @@ $('#btnConfirmarPublicar').addEventListener('click', () => {
     clef: '𝄞',
   };
 
-  partiturasMock.unshift(nova);
+  // Exemplo: buscar partituras
+const res = await fetch('http://localhost:3000/api/partituras?genero=jazz');
+const data = await res.json();
+console.log(data.partituras);
+
+// Exemplo: login
+const res = await fetch('http://localhost:3000/api/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email: 'ana@partitura.com', senha: 'senha123' })
+});
+const { token, usuario } = await res.json();
+localStorage.setItem('token', token);
+
+// Exemplo: criar partitura (autenticado)
+const token = localStorage.getItem('token');
+const res = await fetch('http://localhost:3000/api/partituras', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({ titulo: 'Nova Peça', compositor: 'Eu', genero: 'mpb' })
+});
 
   // Volta o filtro para todos e rerenderiza
   filtroAtivo = 'todos';
