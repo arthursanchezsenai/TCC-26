@@ -415,30 +415,106 @@ $('#btnConfirmarPublicar').addEventListener('click', () => {
   };
 
   // Exemplo: buscar partituras
-const res = await fetch('http://localhost:3000/api/partituras?genero=jazz');
-const data = await res.json();
-console.log(data.partituras);
+
+
+async function carregarDados() {
+    const resposta = await fetch('http://localhost:3000/api/partituras?genero=jazz');
+    const dados = await resposta.json();
+
+    console.log(dados);
+}
+
 
 // Exemplo: login
-const res = await fetch('http://localhost:3000/api/auth/login', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email: 'ana@partitura.com', senha: 'senha123' })
-});
-const { token, usuario } = await res.json();
-localStorage.setItem('token', token);
+// ===============================
+// LOGIN
+// ===============================
+async function fazerLogin() {
+    try {
+        const res = await fetch('http://localhost:3000/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: 'ana@partitura.com',
+                senha: 'senha123'
+            })
+        });
 
-// Exemplo: criar partitura (autenticado)
-const token = localStorage.getItem('token');
-const res = await fetch('http://localhost:3000/api/partituras', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  },
-  body: JSON.stringify({ titulo: 'Nova Peça', compositor: 'Eu', genero: 'mpb' })
-});
+        if (!res.ok) {
+            throw new Error('Erro ao fazer login');
+        }
 
+        const dados = await res.json();
+
+        const token = dados.token;
+        const usuario = dados.usuario;
+
+        // Salva o token no navegador
+        localStorage.setItem('token', token);
+
+        console.log('Login realizado com sucesso!');
+        console.log('Usuário:', usuario);
+
+        return token;
+
+    } catch (erro) {
+        console.error('Erro no login:', erro);
+    }
+}
+
+
+// ===============================
+// CRIAR PARTITURA
+// ===============================
+async function criarPartitura() {
+    try {
+        // Pega o token salvo no login
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+            console.error('Usuário não está autenticado.');
+            return;
+        }
+
+        const res = await fetch('http://localhost:3000/api/partituras', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                titulo: 'Nova Peça',
+                compositor: 'Eu',
+                genero: 'mpb'
+            })
+        });
+
+        if (!res.ok) {
+            throw new Error('Erro ao criar partitura');
+        }
+
+        const dados = await res.json();
+
+        console.log('Partitura criada com sucesso!');
+        console.log(dados);
+
+    } catch (erro) {
+        console.error('Erro ao criar partitura:', erro);
+    }
+}
+
+
+// ===============================
+// EXECUTAR
+// ===============================
+async function iniciar() {
+    await fazerLogin();
+    await criarPartitura();
+}
+
+iniciar();
   // Volta o filtro para todos e rerenderiza
   filtroAtivo = 'todos';
   $$('.filtro').forEach(b => b.classList.remove('filtro--active'));
@@ -549,5 +625,5 @@ $$('.step, .form-card, .about-text, .about-visual, .score-preview').forEach(el =
   el.style.opacity = '0';
   el.style.transform = 'translateY(24px)';
   el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-  sectionObserver.observe(el);
+
 });
