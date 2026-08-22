@@ -627,3 +627,28 @@ $$('.step, .form-card, .about-text, .about-visual, .score-preview').forEach(el =
   el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
 
 });
+
+function exibirPartituras(partituras) {
+
+    const grid = document.getElementById('cardsGrid');
+
+    grid.innerHTML = '';
+
+    partituras.forEach(partitura => {
+
+        const card = document.createElement('div');
+
+        card.classList.add('score-card');
+
+        card.innerHTML = `
+            <h3>${partitura.titulo}</h3>
+            <p>${partitura.compositor}</p>
+            <span>${partitura.genero}</span>
+            <small>${partitura.visualizacoes} visualizações</small>
+        `;
+
+        grid.appendChild(card);
+    });
+}
+
+carregarPartituras();
