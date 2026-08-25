@@ -1,15 +1,16 @@
 /* ============================================================
    PARTITURA — script.js
-   Módulos: Loader | Header | Hero | Cards | Editor Canvas |
+   Módulos: Loader | Header | Hero | Cards | Editor Canvas
+            (com regra de tempo + reprodução de áudio) |
             Stats | Filtros | Modal | Formulário | Toast
    ============================================================ */
-
+ 
 'use strict';
-
+ 
 /* ── Utilitários ── */
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
 const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
-
+ 
 /* ============================================================
    1. LOADER
    ============================================================ */
@@ -17,23 +18,23 @@ window.addEventListener('load', () => {
   const loader = $('#loader');
   setTimeout(() => loader.classList.add('hidden'), 1200);
 });
-
+ 
 /* ============================================================
    2. HEADER — scroll + hamburger
    ============================================================ */
 const header = $('#header');
 const hamburger = $('#hamburger');
 const nav = $('#nav');
-
+ 
 window.addEventListener('scroll', () => {
   header.classList.toggle('scrolled', window.scrollY > 40);
 });
-
+ 
 hamburger.addEventListener('click', () => {
   hamburger.classList.toggle('open');
   nav.classList.toggle('open');
 });
-
+ 
 // Fecha o nav ao clicar em um link
 $$('.nav__link').forEach(link => {
   link.addEventListener('click', () => {
@@ -41,13 +42,13 @@ $$('.nav__link').forEach(link => {
     nav.classList.remove('open');
   });
 });
-
+ 
 /* ============================================================
    3. HERO — notas flutuantes
    ============================================================ */
 const heroNotes = $('#heroNotes');
 const noteSymbols = ['♩', '♪', '♫', '♬', '𝄞', '𝄢', '♭', '♯'];
-
+ 
 function createNote() {
   const el = document.createElement('span');
   el.classList.add('floating-note');
@@ -62,9 +63,9 @@ function createNote() {
   heroNotes.appendChild(el);
   setTimeout(() => el.remove(), (duration + delay) * 1000 + 200);
 }
-
+ 
 setInterval(createNote, 700);
-
+ 
 /* ============================================================
    4. CONTADOR DE ESTATÍSTICAS (scroll trigger)
    ============================================================ */
@@ -75,7 +76,7 @@ function animateCounter(el) {
   const steps = Math.floor(duration / step);
   let current = 0;
   const increment = target / steps;
-
+ 
   const timer = setInterval(() => {
     current += increment;
     if (current >= target) {
@@ -86,7 +87,7 @@ function animateCounter(el) {
     }
   }, step);
 }
-
+ 
 const statsObserver = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
@@ -95,9 +96,9 @@ const statsObserver = new IntersectionObserver((entries) => {
     }
   });
 }, { threshold: 0.5 });
-
+ 
 $$('.stat__number').forEach(el => statsObserver.observe(el));
-
+ 
 /* ============================================================
    5. DADOS MOCK DAS PARTITURAS
    ============================================================ */
@@ -112,7 +113,7 @@ const partiturasMock = [
   { id: 8, titulo: 'Chorinho de Domingo',   compositor: 'Tiago Barbosa',    genero: 'popular', likes: 289, clef: '𝄞' },
   { id: 9, titulo: 'Elegia Moderna',        compositor: 'Sofia Ramos',      genero: 'contemporaneo', likes: 63, clef: '𝄢' },
 ];
-
+ 
 const generoNomes = {
   classico: 'Clássico',
   jazz: 'Jazz',
@@ -120,26 +121,26 @@ const generoNomes = {
   popular: 'Popular',
   contemporaneo: 'Contemporâneo',
 };
-
+ 
 let filtroAtivo = 'todos';
 let partiturasVisiveis = 6;
-
+ 
 /* ── Renderiza os cards ── */
 function renderCards() {
   const grid = $('#cardsGrid');
   grid.innerHTML = '';
-
+ 
   const filtradas = filtroAtivo === 'todos'
     ? partiturasMock
     : partiturasMock.filter(p => p.genero === filtroAtivo);
-
+ 
   const exibir = filtradas.slice(0, partiturasVisiveis);
-
+ 
   if (exibir.length === 0) {
     grid.innerHTML = '<p style="color:var(--text-muted);text-align:center;grid-column:1/-1;padding:3rem;">Nenhuma partitura encontrada.</p>';
     return;
   }
-
+ 
   exibir.forEach((p, i) => {
     const card = document.createElement('div');
     card.classList.add('card');
@@ -164,14 +165,14 @@ function renderCards() {
     `;
     grid.appendChild(card);
   });
-
+ 
   // Botão "ver mais"
   const btnVerMais = $('#btnVerMais');
   btnVerMais.style.display = filtradas.length > partiturasVisiveis ? '' : 'none';
 }
-
+ 
 renderCards();
-
+ 
 /* ── Filtros ── */
 $$('.filtro').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -182,13 +183,13 @@ $$('.filtro').forEach(btn => {
     renderCards();
   });
 });
-
+ 
 /* ── Ver mais ── */
 $('#btnVerMais').addEventListener('click', () => {
   partiturasVisiveis += 3;
   renderCards();
 });
-
+ 
 /* ── Download (simulado) ── */
 $('#cardsGrid').addEventListener('click', e => {
   if (e.target.classList.contains('card__dl-btn')) {
@@ -197,59 +198,26 @@ $('#cardsGrid').addEventListener('click', e => {
     if (p) showToast(`Download iniciado: "${p.titulo}"`);
   }
 });
-
+ 
 /* ============================================================
-   6. EDITOR — CANVAS
+   6. EDITOR — CANVAS (com regra de tempo + áudio)
    ============================================================ */
 const canvas = $('#staffCanvas');
 const ctx = canvas.getContext('2d');
-
+ 
 let toolAtivo = 'semibreve';
-let notasCanvas = []; // { x, y, simbolo, acidente }
-let acidendeAtivo = null;
-
-// Reescala o canvas
-function resizeCanvas() {
-  const w = canvas.parentElement.offsetWidth - (32 * 2); // padding
-  canvas.width = Math.max(w, 300);
-  canvas.height = 220;
-  drawStaff();
-}
-
-// Desenha o pentagrama
-function drawStaff() {
-  const w = canvas.width;
-  const h = canvas.height;
-
-  ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = '#faf8f2';
-  ctx.fillRect(0, 0, w, h);
-
-  // Margem vertical para o pentagrama
-  const staffTop = 50;
-  const staffBottom = 170;
-  const lineGap = (staffBottom - staffTop) / 4;
-
-  // 5 linhas
-  ctx.strokeStyle = '#3a2f1e';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 5; i++) {
-    const y = staffTop + i * lineGap;
-    ctx.beginPath();
-    ctx.moveTo(50, y);
-    ctx.lineTo(w - 20, y);
-    ctx.stroke();
-  }
-
-  // Clave de Sol (texto)
-  ctx.font = '72px serif';
-  ctx.fillStyle = '#3a2f1e';
-  ctx.fillText('𝄞', 8, staffBottom + 16);
-
-  // Redesenha notas
-  notasCanvas.forEach(n => desenharNota(n));
-}
-
+let acidenteAtivo = null;
+ 
+// notasCanvas agora guarda apenas TIPO, ACIDENTE e ALTURA (pitchOffset).
+// A posição X é sempre recalculada a partir da duração de cada figura
+// (calcularLayoutNotas), o que permite aplicar a regra de tempo e
+// tocar as notas na ordem certa.
+let notasCanvas = []; // { tipo, acidente, pitchOffset }
+ 
+const STAFF_TOP = 50;
+const STAFF_BOTTOM = 170;
+const STEP = 15; // px por grau da escala (linha ou espaço)
+ 
 const simbolosNota = {
   semibreve: '𝅝',
   minima:    '𝅗𝅥',
@@ -257,104 +225,299 @@ const simbolosNota = {
   colcheia:  '♪',
   pausa:     '𝄽',
 };
-
+ 
+/* ── Regra de tempo (compasso) ──
+   Cada figura vale um número de "tempos" (unidade = semínima).
+   pausa é tratada como pausa de semínima (1 tempo). */
+const duracaoMap = {
+  semibreve: 4,
+  minima: 2,
+  seminima: 1,
+  colcheia: 0.5,
+  pausa: 1,
+};
+ 
+const compassosDisponiveis = {
+  '2/4': { numerador: 2, denominador: 4 },
+  '3/4': { numerador: 3, denominador: 4 },
+  '4/4': { numerador: 4, denominador: 4 },
+  '6/8': { numerador: 6, denominador: 8 },
+};
+ 
+let compassoAtual = compassosDisponiveis['4/4'];
+let beatsCompassoAtual = 0;
+ 
+function capacidadeAtual() {
+  // Capacidade do compasso convertida para "tempos de semínima"
+  return compassoAtual.numerador * (4 / compassoAtual.denominador);
+}
+ 
+function recalcularBeatsAtuais() {
+  const cap = capacidadeAtual();
+  let acc = 0;
+  notasCanvas.forEach(n => {
+    acc += duracaoMap[n.tipo] || 1;
+    if (acc >= cap - 1e-6) acc = 0;
+  });
+  beatsCompassoAtual = acc;
+}
+ 
+function atualizarContadorTempo() {
+  const label = document.getElementById('contadorTempoLabel');
+  if (label) {
+    const cap = capacidadeAtual();
+    label.textContent = `Compasso: ${beatsCompassoAtual} / ${cap} tempos`;
+  }
+}
+ 
+/* ── Tabela de alturas (posição no pentagrama → nota real) ──
+   offset 0 = E4 (linha de baixo da clave de Sol). Cada passo de
+   15px equivale a um grau diatônico (linha ou espaço). */
+const pitchTable = {
+  '-6': { nome: 'F3', midi: 53 },
+  '-5': { nome: 'G3', midi: 55 },
+  '-4': { nome: 'A3', midi: 57 },
+  '-3': { nome: 'B3', midi: 59 },
+  '-2': { nome: 'C4', midi: 60 },
+  '-1': { nome: 'D4', midi: 62 },
+  '0':  { nome: 'E4', midi: 64 },
+  '1':  { nome: 'F4', midi: 65 },
+  '2':  { nome: 'G4', midi: 67 },
+  '3':  { nome: 'A4', midi: 69 },
+  '4':  { nome: 'B4', midi: 71 },
+  '5':  { nome: 'C5', midi: 72 },
+  '6':  { nome: 'D5', midi: 74 },
+  '7':  { nome: 'E5', midi: 76 },
+  '8':  { nome: 'F5', midi: 77 },
+  '9':  { nome: 'G5', midi: 79 },
+  '10': { nome: 'A5', midi: 81 },
+  '11': { nome: 'B5', midi: 83 },
+  '12': { nome: 'C6', midi: 84 },
+};
+ 
+function yFromOffset(offset) {
+  return STAFF_BOTTOM - offset * STEP;
+}
+ 
+function offsetFromY(y) {
+  const bruto = Math.round((STAFF_BOTTOM - y) / STEP);
+  return Math.max(-6, Math.min(12, bruto));
+}
+ 
+/* ── Layout: transforma a lista de notas (sem X) em posições X
+   sequenciais, respeitando a duração de cada figura e inserindo
+   barras de compasso quando a capacidade do compasso é atingida ── */
+function calcularLayoutNotas() {
+  const xInicio = 95;
+  const espacoPorBeat = 46;
+  const espacoBarra = 20;
+  const cap = capacidadeAtual();
+ 
+  let x = xInicio;
+  let beats = 0;
+  const layout = [];
+  const barras = [];
+ 
+  notasCanvas.forEach(n => {
+    const dur = duracaoMap[n.tipo] || 1;
+    layout.push({ ...n, x });
+    x += dur * espacoPorBeat;
+    beats += dur;
+    if (beats >= cap - 1e-6) {
+      x += espacoBarra;
+      barras.push(x - espacoBarra / 2);
+      beats = 0;
+    }
+  });
+ 
+  return { layout, barras, larguraTotal: x };
+}
+ 
+// Reescala o canvas
+function resizeCanvas() {
+  canvas.parentElement.style.overflowX = 'auto';
+  drawStaff();
+}
+ 
+// Desenha o pentagrama, as barras de compasso e as notas
+function drawStaff() {
+  const { layout, barras, larguraTotal } = calcularLayoutNotas();
+ 
+  const larguraMinima = canvas.parentElement.offsetWidth - (32 * 2);
+  const w = Math.max(larguraMinima, larguraTotal + 40, 300);
+  const h = 220;
+  canvas.width = w;
+  canvas.height = h;
+ 
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#faf8f2';
+  ctx.fillRect(0, 0, w, h);
+ 
+  // 5 linhas
+  ctx.strokeStyle = '#3a2f1e';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    const y = STAFF_TOP + i * ((STAFF_BOTTOM - STAFF_TOP) / 4);
+    ctx.beginPath();
+    ctx.moveTo(50, y);
+    ctx.lineTo(w - 20, y);
+    ctx.stroke();
+  }
+ 
+  // Clave de Sol
+  ctx.font = '72px serif';
+  ctx.fillStyle = '#3a2f1e';
+  ctx.fillText('𝄞', 8, STAFF_BOTTOM + 16);
+ 
+  // Barras de compasso (regra de tempo em ação)
+  ctx.lineWidth = 1.5;
+  barras.forEach(bx => {
+    ctx.beginPath();
+    ctx.moveTo(bx, STAFF_TOP);
+    ctx.lineTo(bx, STAFF_BOTTOM);
+    ctx.stroke();
+  });
+ 
+  // Barra final dupla
+  if (layout.length > 0) {
+    const xFinal = larguraTotal + 6;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(xFinal, STAFF_TOP);
+    ctx.lineTo(xFinal, STAFF_BOTTOM);
+    ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(xFinal + 5, STAFF_TOP);
+    ctx.lineTo(xFinal + 5, STAFF_BOTTOM);
+    ctx.stroke();
+  }
+ 
+  // Notas / pausas
+  layout.forEach(n => desenharNota(n));
+}
+ 
+function desenharLedger(x, offset) {
+  ctx.strokeStyle = '#3a2f1e';
+  ctx.lineWidth = 1;
+  const linha = (o) => {
+    const ly = yFromOffset(o);
+    ctx.beginPath();
+    ctx.moveTo(x - 12, ly);
+    ctx.lineTo(x + 12, ly);
+    ctx.stroke();
+  };
+  if (offset >= 9) {
+    for (let o = 10; o <= offset; o += 2) linha(o);
+  }
+  if (offset <= -2) {
+    for (let o = -2; o >= offset; o -= 2) linha(o);
+  }
+}
+ 
 function desenharNota(n) {
-  ctx.font = '28px serif';
-  ctx.fillStyle = '#1a0f00';
-
+  if (n.tipo === 'pausa') {
+    ctx.font = '28px serif';
+    ctx.fillStyle = '#1a0f00';
+    ctx.fillText(simbolosNota.pausa, n.x, 95 + 8);
+    return;
+  }
+ 
+  const y = yFromOffset(n.pitchOffset);
+  desenharLedger(n.x, n.pitchOffset);
+ 
   if (n.acidente) {
     ctx.font = '16px serif';
     ctx.fillStyle = '#8a4a00';
-    const acidendeSimbolos = { sustenido: '♯', bemol: '♭', natural: '♮' };
-    ctx.fillText(acidendeSimbolos[n.acidente] || '', n.x - 14, n.y + 8);
-    ctx.font = '28px serif';
-    ctx.fillStyle = '#1a0f00';
+    const acidenteSimbolos = { sustenido: '♯', bemol: '♭', natural: '♮' };
+    ctx.fillText(acidenteSimbolos[n.acidente] || '', n.x - 16, y + 8);
   }
-
-  const simbolo = simbolosNota[n.tipo] || '♩';
-  ctx.fillText(simbolo, n.x, n.y + 8);
+ 
+  ctx.font = '28px serif';
+  ctx.fillStyle = '#1a0f00';
+  ctx.fillText(simbolosNota[n.tipo] || '♩', n.x, y + 8);
 }
-
-// Clique no canvas para inserir nota
+ 
+// Clique no pentagrama define a ALTURA da próxima figura.
+// A posição X é sempre calculada automaticamente (ver calcularLayoutNotas),
+// o que garante que a regra de tempo do compasso seja sempre respeitada.
 canvas.addEventListener('click', (e) => {
   const rect = canvas.getBoundingClientRect();
-  // Ajuste de escala para canvas vs display
-  const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
-  const x = (e.clientX - rect.left) * scaleX;
-  const y = (e.clientY - rect.top) * scaleY;
-
-  // Não inserir fora do pentagrama
-  if (x < 60 || x > canvas.width - 25) return;
-
-  const novaNota = {
-    x: Math.round(x - 8),
-    y: Math.round(y - 4),
-    tipo: toolAtivo,
-    acidente: acidendeAtivo,
-  };
-
-  // Não inserir acidentes como nota
-  if (['sustenido', 'bemol', 'natural'].includes(toolAtivo)) {
-    acidendeAtivo = toolAtivo;
-    showToast(`Acidente selecionado: ${toolAtivo}. Agora clique para inserir uma nota.`);
+  const yClique = (e.clientY - rect.top) * scaleY;
+ 
+  const dur = duracaoMap[toolAtivo] || 1;
+  const cap = capacidadeAtual();
+ 
+  if (beatsCompassoAtual + dur > cap + 1e-6) {
+    const restante = cap - beatsCompassoAtual;
+    showToast(`Não cabe nesse compasso (${compassoAtual.numerador}/${compassoAtual.denominador}). Restam ${restante} tempo(s) — escolha uma figura menor.`, true);
     return;
   }
-
-  // Pausa: colocar no centro do pentagrama
-  if (toolAtivo === 'pausa') {
-    novaNota.y = 95;
-  }
-
-  notasCanvas.push(novaNota);
-  acidendeAtivo = null; // reseta acidente após uso
+ 
+  const offset = offsetFromY(yClique);
+ 
+  notasCanvas.push({
+    tipo: toolAtivo,
+    acidente: acidenteAtivo,
+    pitchOffset: offset,
+  });
+ 
+  acidenteAtivo = null;
+  beatsCompassoAtual += dur;
+  if (beatsCompassoAtual >= cap - 1e-6) beatsCompassoAtual = 0;
+ 
+  atualizarContadorTempo();
   drawStaff();
 });
-
+ 
 // Toolbar: seleção de ferramenta
 $$('.tool-btn[data-tool]').forEach(btn => {
   btn.addEventListener('click', () => {
-    // Remove active de notas e clave
     $$('.tool-btn[data-tool]').forEach(b => {
       const t = b.dataset.tool;
-      if (!['sustenido','bemol','natural'].includes(t)) b.classList.remove('active');
+      if (!['sustenido', 'bemol', 'natural'].includes(t)) b.classList.remove('active');
     });
-
+ 
     const t = btn.dataset.tool;
     if (['sustenido', 'bemol', 'natural'].includes(t)) {
-      acidendeAtivo = t;
+      acidenteAtivo = t;
       btn.classList.add('active');
       setTimeout(() => btn.classList.remove('active'), 2000);
-      showToast(`Acidente ativo: ${t}. Clique em uma nota ou no pentagrama.`);
+      showToast(`Acidente ativo: ${t}. Clique no pentagrama para inserir a próxima nota.`);
       return;
     }
-
+ 
     toolAtivo = t;
     btn.classList.add('active');
   });
 });
-
+ 
 // Desfazer
 $('#btnDesfazer').addEventListener('click', () => {
   notasCanvas.pop();
+  recalcularBeatsAtuais();
+  atualizarContadorTempo();
   drawStaff();
   showToast('Última nota removida.');
 });
-
+ 
 // Limpar
 $('#btnLimpar').addEventListener('click', () => {
   if (notasCanvas.length === 0) return;
   if (confirm('Limpar todas as notas do pentagrama?')) {
     notasCanvas = [];
+    beatsCompassoAtual = 0;
+    atualizarContadorTempo();
     drawStaff();
     showToast('Pentagrama limpo.');
   }
 });
-
+ 
 // Inicializa canvas
 window.addEventListener('resize', resizeCanvas);
 setTimeout(resizeCanvas, 100);
-
+ 
 /* ── Ações do editor ── */
 $('#btnPublicar').addEventListener('click', () => {
   const titulo = $('#tituloPartitura').value.trim();
@@ -365,41 +528,194 @@ $('#btnPublicar').addEventListener('click', () => {
   }
   $('#modalPublicar').classList.add('open');
 });
-
+ 
 $('#btnPreview').addEventListener('click', () => {
   showToast('Pré-visualização em tela cheia em breve!');
 });
-
+ 
 $('#btnExportar').addEventListener('click', () => {
   showToast('Exportação para PDF disponível na versão final do TCC.');
 });
-
+ 
 /* ── CTA Hero ── */
 $('#btnCriarHero').addEventListener('click', () => {
   document.querySelector('#criar').scrollIntoView({ behavior: 'smooth' });
 });
-
+ 
 $('#btnExplorarHero').addEventListener('click', () => {
   document.querySelector('#explorar').scrollIntoView({ behavior: 'smooth' });
 });
-
+ 
+/* ============================================================
+   6.1 ÁUDIO — reproduz as notas do pentagrama como piano
+   ============================================================ */
+let audioCtx = null;
+let osciladoresAtivos = [];
+let masterGainAtivo = null;
+let bpmAtual = 100;
+ 
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+ 
+function midiParaFrequencia(midi) {
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+ 
+// Timbre simplificado de piano: fundamental + harmônicos com
+// envelope de ataque rápido e decaimento exponencial (estilo "corda dedilhada").
+function tocarNota(freq, startTime, duracaoSeg, ctxAudio, masterGain) {
+  const parciais = [
+    { mult: 1, ganho: 0.6 },
+    { mult: 2, ganho: 0.25 },
+    { mult: 3, ganho: 0.1 },
+    { mult: 4, ganho: 0.05 },
+  ];
+ 
+  parciais.forEach(p => {
+    const osc = ctxAudio.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = freq * p.mult;
+ 
+    const gain = ctxAudio.createGain();
+    gain.gain.setValueAtTime(0.0001, startTime);
+    gain.gain.linearRampToValueAtTime(p.ganho, startTime + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duracaoSeg * 0.95);
+ 
+    osc.connect(gain).connect(masterGain);
+    osc.start(startTime);
+    osc.stop(startTime + duracaoSeg + 0.05);
+ 
+    osciladoresAtivos.push(osc);
+  });
+}
+ 
+function tocarPartitura() {
+  if (notasCanvas.length === 0) {
+    showToast('Adicione notas ao pentagrama antes de ouvir.', true);
+    return;
+  }
+ 
+  const ctxAudio = getAudioCtx();
+  if (ctxAudio.state === 'suspended') ctxAudio.resume();
+ 
+  const masterGain = ctxAudio.createGain();
+  masterGain.gain.value = 0.35;
+  masterGain.connect(ctxAudio.destination);
+  masterGainAtivo = masterGain;
+  osciladoresAtivos = [];
+ 
+  const segundosPorTempo = 60 / bpmAtual;
+  let tempoAtual = ctxAudio.currentTime + 0.1;
+ 
+  notasCanvas.forEach(n => {
+    const duracaoSeg = (duracaoMap[n.tipo] || 1) * segundosPorTempo;
+ 
+    if (n.tipo !== 'pausa') {
+      let midi = pitchTable[String(n.pitchOffset)].midi;
+      if (n.acidente === 'sustenido') midi += 1;
+      if (n.acidente === 'bemol') midi -= 1;
+      const freq = midiParaFrequencia(midi);
+      tocarNota(freq, tempoAtual, duracaoSeg, ctxAudio, masterGain);
+    }
+ 
+    tempoAtual += duracaoSeg;
+  });
+ 
+  showToast('🎹 Reproduzindo partitura...');
+}
+ 
+function pararPartitura() {
+  osciladoresAtivos.forEach(osc => {
+    try { osc.stop(); } catch (e) { /* já parado */ }
+  });
+  osciladoresAtivos = [];
+  if (masterGainAtivo) {
+    try { masterGainAtivo.disconnect(); } catch (e) { /* já desconectado */ }
+  }
+  showToast('Reprodução interrompida.');
+}
+ 
+/* ── Painel de compasso / andamento / áudio (injetado via JS) ── */
+const painelExtra = document.createElement('div');
+painelExtra.id = 'painelRegrasTempo';
+painelExtra.style.cssText = `
+  display:flex; flex-wrap:wrap; align-items:center; gap:1.25rem;
+  margin-top:1rem; padding:1rem 1.25rem;
+  background: var(--bg-alt, #faf8f2);
+  border: 1px solid var(--border, #d8cdb8);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--text, #1a0f00);
+`;
+painelExtra.innerHTML = `
+  <label style="display:flex;align-items:center;gap:.5rem;">
+    Compasso:
+    <select id="compassoSelect" style="padding:.35rem .5rem;border-radius:6px;border:1px solid var(--border,#d8cdb8);background:#fff;">
+      <option value="2/4">2/4</option>
+      <option value="3/4">3/4</option>
+      <option value="4/4" selected>4/4</option>
+      <option value="6/8">6/8</option>
+    </select>
+  </label>
+  <span id="contadorTempoLabel" style="color:var(--text-muted,#6b6152);"></span>
+  <label style="display:flex;align-items:center;gap:.5rem;">
+    Andamento: <span id="bpmLabel">100</span> BPM
+    <input id="bpmRange" type="range" min="40" max="200" value="100" style="width:120px;">
+  </label>
+  <button id="btnOuvir" type="button" style="background:var(--gold,#c9a227);color:#1a0f00;font-weight:600;border:none;padding:.5rem 1rem;border-radius:6px;cursor:pointer;">🎹 Ouvir partitura</button>
+  <button id="btnPararSom" type="button" style="background:transparent;color:var(--text,#1a0f00);border:1px solid var(--border,#d8cdb8);padding:.5rem 1rem;border-radius:6px;cursor:pointer;">⏹ Parar</button>
+`;
+canvas.insertAdjacentElement('afterend', painelExtra);
+ 
+$('#compassoSelect').addEventListener('change', (e) => {
+  const novo = compassosDisponiveis[e.target.value];
+ 
+  if (notasCanvas.length > 0) {
+    const ok = confirm('Trocar o compasso vai limpar as notas já inseridas nesta versão do editor. Deseja continuar?');
+    if (!ok) {
+      e.target.value = `${compassoAtual.numerador}/${compassoAtual.denominador}`;
+      return;
+    }
+  }
+ 
+  compassoAtual = novo;
+  notasCanvas = [];
+  beatsCompassoAtual = 0;
+  atualizarContadorTempo();
+  drawStaff();
+  showToast(`Compasso alterado para ${e.target.value}.`);
+});
+ 
+$('#bpmRange').addEventListener('input', (e) => {
+  bpmAtual = parseInt(e.target.value, 10);
+  $('#bpmLabel').textContent = bpmAtual;
+});
+ 
+$('#btnOuvir').addEventListener('click', tocarPartitura);
+$('#btnPararSom').addEventListener('click', pararPartitura);
+ 
+// Estado inicial do contador de tempo
+atualizarContadorTempo();
+ 
 /* ============================================================
    7. MODAL PUBLICAR
    ============================================================ */
 $('#modalClose').addEventListener('click', fecharModal);
 $('#modalOverlay').addEventListener('click', fecharModal);
-
+ 
 function fecharModal() {
   $('#modalPublicar').classList.remove('open');
 }
-
+ 
 $('#btnConfirmarPublicar').addEventListener('click', () => {
   fecharModal();
-
+ 
   const titulo = $('#tituloPartitura').value.trim() || 'Nova Partitura';
   const compositor = $('#compositorPartitura').value.trim() || 'Anônimo';
   const genero = $('#generoPublicar').value.toLowerCase().replace('â', 'a').replace('ê', 'e');
-
+ 
   // Adiciona ao mock
   const nova = {
     id: Date.now(),
@@ -413,127 +729,30 @@ $('#btnConfirmarPublicar').addEventListener('click', () => {
     likes: 0,
     clef: '𝄞',
   };
-
-  // Exemplo: buscar partituras
-
-
-async function carregarDados() {
-    const resposta = await fetch('http://localhost:3000/api/partituras?genero=jazz');
-    const dados = await resposta.json();
-
-    console.log(dados);
-}
-
-
-// Exemplo: login
-// ===============================
-// LOGIN
-// ===============================
-async function fazerLogin() {
-    try {
-        const res = await fetch('http://localhost:3000/api/auth/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                email: 'ana@partitura.com',
-                senha: 'senha123'
-            })
-        });
-
-        if (!res.ok) {
-            throw new Error('Erro ao fazer login');
-        }
-
-        const dados = await res.json();
-
-        const token = dados.token;
-        const usuario = dados.usuario;
-
-        // Salva o token no navegador
-        localStorage.setItem('token', token);
-
-        console.log('Login realizado com sucesso!');
-        console.log('Usuário:', usuario);
-
-        return token;
-
-    } catch (erro) {
-        console.error('Erro no login:', erro);
-    }
-}
-
-
-// ===============================
-// CRIAR PARTITURA
-// ===============================
-async function criarPartitura() {
-    try {
-        // Pega o token salvo no login
-        const token = localStorage.getItem('token');
-
-        if (!token) {
-            console.error('Usuário não está autenticado.');
-            return;
-        }
-
-        const res = await fetch('http://localhost:3000/api/partituras', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                titulo: 'Nova Peça',
-                compositor: 'Eu',
-                genero: 'mpb'
-            })
-        });
-
-        if (!res.ok) {
-            throw new Error('Erro ao criar partitura');
-        }
-
-        const dados = await res.json();
-
-        console.log('Partitura criada com sucesso!');
-        console.log(dados);
-
-    } catch (erro) {
-        console.error('Erro ao criar partitura:', erro);
-    }
-}
-
-
-// ===============================
-// EXECUTAR
-// ===============================
-async function iniciar() {
-    await fazerLogin();
-    await criarPartitura();
-}
-
-iniciar();
+ 
+  partiturasMock.unshift(nova);
+ 
   // Volta o filtro para todos e rerenderiza
   filtroAtivo = 'todos';
   $$('.filtro').forEach(b => b.classList.remove('filtro--active'));
   $('.filtro[data-genre="todos"]').classList.add('filtro--active');
   partiturasVisiveis = 6;
   renderCards();
-
+ 
   // Rola até o acervo
   document.querySelector('#explorar').scrollIntoView({ behavior: 'smooth' });
-
+ 
   showToast(`🎼 "${titulo}" publicada com sucesso!`);
-
+ 
   // Limpa editor
   notasCanvas = [];
+  beatsCompassoAtual = 0;
+  atualizarContadorTempo();
   drawStaff();
   $('#tituloPartitura').value = '';
   $('#compositorPartitura').value = '';
 });
-
+ 
 /* ============================================================
    8. FORMULÁRIO DE CONTATO
    ============================================================ */
@@ -541,52 +760,52 @@ $('#btnEnviar').addEventListener('click', () => {
   const nome = $('#nome').value.trim();
   const email = $('#email').value.trim();
   const mensagem = $('#mensagem').value.trim();
-
+ 
   if (!nome || !email || !mensagem) {
     showToast('Preencha todos os campos obrigatórios.', true);
     return;
   }
-
+ 
   if (!email.includes('@') || !email.includes('.')) {
     showToast('Insira um e-mail válido.', true);
     return;
   }
-
+ 
   showToast(`✉️ Mensagem enviada com sucesso, ${nome}!`);
   $('#nome').value = '';
   $('#email').value = '';
   $('#assunto').value = '';
   $('#mensagem').value = '';
 });
-
+ 
 /* ============================================================
    9. HEADER — botões Login / Cadastro
    ============================================================ */
 $('#btnLogin').addEventListener('click', () => showToast('Login em breve! Funcionalidade no roadmap.'));
 $('#btnCadastro').addEventListener('click', () => showToast('Cadastro em breve! Funcionalidade no roadmap.'));
-
+ 
 /* ============================================================
    10. TOAST
    ============================================================ */
 let toastTimer;
-
+ 
 function showToast(msg, isError = false) {
   const toast = $('#toast');
   toast.textContent = msg;
   toast.style.borderColor = isError ? '#c94c4c' : 'var(--gold)';
   toast.style.color = isError ? '#e8c0c0' : 'var(--text)';
   toast.classList.add('show');
-
+ 
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('show'), 3200);
 }
-
+ 
 /* ============================================================
    11. PREVIEW ANIMADO — seção Sobre
    ============================================================ */
 const scoreDisplay = $('#scoreNotesDisplay');
 const notesList = ['♩', '♪', '♫', '♬'];
-
+ 
 let noteIndex = 0;
 function addAnimatedNote() {
   if (!scoreDisplay) return;
@@ -604,14 +823,14 @@ function addAnimatedNote() {
     scoreDisplay.removeChild(scoreDisplay.firstChild);
   }
 }
-
+ 
 setInterval(addAnimatedNote, 900);
-
+ 
 /* ============================================================
    12. INTERSECTION OBSERVER — animações de entrada
    ============================================================ */
 const observerOptions = { threshold: 0.12 };
-
+ 
 const sectionObserver = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
@@ -620,35 +839,10 @@ const sectionObserver = new IntersectionObserver((entries) => {
     }
   });
 }, observerOptions);
-
+ 
 $$('.step, .form-card, .about-text, .about-visual, .score-preview').forEach(el => {
   el.style.opacity = '0';
   el.style.transform = 'translateY(24px)';
   el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-
 });
-
-function exibirPartituras(partituras) {
-
-    const grid = document.getElementById('cardsGrid');
-
-    grid.innerHTML = '';
-
-    partituras.forEach(partitura => {
-
-        const card = document.createElement('div');
-
-        card.classList.add('score-card');
-
-        card.innerHTML = `
-            <h3>${partitura.titulo}</h3>
-            <p>${partitura.compositor}</p>
-            <span>${partitura.genero}</span>
-            <small>${partitura.visualizacoes} visualizações</small>
-        `;
-
-        grid.appendChild(card);
-    });
-}
-
-carregarPartituras();
+ 
